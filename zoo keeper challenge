@@ -1,0 +1,126 @@
+import java.io.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+public class ZookeepersChallenge {
+
+    private static final Map<String, Integer> speciesCounter = new HashMap<>();
+
+    public static void main(String[] args) {
+        try {
+            Map<String, List<Animal>> habitats = processAnimals(
+                    readFile("arrivingAnimals.txt"), readFile("animalNames.txt")
+            );
+            generateZooReport(habitats, "zooPopulation.txt");
+            System.out.println("Zoo report generated successfully: zooPopulation.txt");
+        } catch (IOException e) {
+            System.err.println("Error while processing files: " + e.getMessage());
+        }
+    }
+
+    private static List<String> readFile(String filepath) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filepath))) {
+            return reader.lines().map(String::trim).toList();
+        }
+    }
+
+    private static Map<String, List<Animal>> processAnimals(List<String> animalData, List<String> animalNames) {
+        Map<String, List<Animal>> habitats = new HashMap<>();
+        Iterator<String> namesIterator = animalNames.iterator();
+
+        for (String animalDetails : animalData) {
+            try {
+                Animal animal = parseAnimal(animalDetails, namesIterator);
+                habitats.computeIfAbsent(animal.getSpecies() + " Habitat", k -> new ArrayList<>()).add(animal);
+            } catch (Exception e) {
+                System.err.println("Error processing animal data: " + animalDetails);
+            }
+        }
+        return habitats;
+    }
+
+    private static Animal parseAnimal(String details, Iterator<String> namesIterator) {
+        String[] parts = details.split(",");
+        if (parts.length < 3) throw new IllegalArgumentException("Invalid animal details format.");
+
+        String[] firstPart = parts[0].trim().split(" ");
+        String species = firstPart[3];
+        String name = namesIterator.hasNext() ? namesIterator.next() : "Unnamed";
+
+        return new Animal(
+                genUniqueID(species), name, genBirthDay(
+                        Integer.parseInt(firstPart[0]), parts[1].trim()
+                ),
+                parts[2].trim().split(" ")[0], firstPart[2], parts[2].trim().split(" ")[3], species, parts[3].trim()
+        );
+    }
+
+    private static LocalDate genBirthDay(int age, String birthInfo) {
+        int birthYear = LocalDate.now().getYear() - age;
+        return LocalDate.of(birthYear, switch (birthInfo.toLowerCase()) {
+            case "spring" -> 3;
+            case "summer" -> 6;
+            case "autumn", "fall" -> 9;
+            case "winter" -> 12;
+            default -> 1;
+        }, 21);
+    }
+
+    private static String genUniqueID(String species) {
+        String speciesCode = switch (species.toLowerCase()) {
+            case "hyena" -> "Hy";
+            case "lion" -> "Li";
+            case "elephant" -> "El";
+            case "giraffe" -> "Gi";
+            default -> "Un";
+        };
+        int count = speciesCounter.merge(speciesCode, 1, Integer::sum);
+        return speciesCode + String.format("%02d", count);
+    }
+
+    private static void generateZooReport(Map<String, List<Animal>> habitats, String outputPath) throws IOException {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputPath))) {
+            for (var entry : habitats.entrySet()) {
+                writer.write(entry.getKey() + ":\n");
+                for (Animal animal : entry.getValue()) {
+                    writer.write(animal + "\n");
+                }
+                writer.write("\n");
+            }
+        }
+    }
+}
+
+class Animal {
+    private final String id;
+    private final String name;
+    private final LocalDate birthday;
+    private final String color;
+    private final String gender;
+    private final String weight;
+    private final String species;
+    private final String origin;
+
+    public Animal(String id, String name, LocalDate birthday, String color, String gender, String weight, String species, String origin) {
+        this.id = id;
+        this.name = name;
+        this.birthday = birthday;
+        this.color = color;
+        this.gender = gender;
+        this.weight = weight;
+        this.species = species;
+        this.origin = origin;
+    }
+
+    public String getSpecies() {
+        return species;
+    }
+
+    @Override
+    public String toString() {
+        var formatter = DateTimeFormatter.ISO_LOCAL_DATE;
+        return String.format("%s; %s; birth date: %s; %s; %s; %s pounds; %s; arrived %s",
+                id, name, birthday.format(formatter), color, gender, weight, origin, LocalDate.now().format(formatter));
+    }
+}
